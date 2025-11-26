@@ -19,7 +19,6 @@ public class CloudinaryService {
         
         // ⭐ CRITICAL FIX: Use file.getInputStream() instead of file.getBytes()
         // This streams the file content to Cloudinary, preventing an OutOfMemoryError
-        // for large files (like your 200MB videos).
         Map uploadResult = cloudinary.uploader().upload(file.getInputStream(),
                 ObjectUtils.asMap("resource_type", "auto"));
         
