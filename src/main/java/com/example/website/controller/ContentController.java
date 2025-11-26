@@ -189,8 +189,8 @@ public class ContentController {
             
             // Determine the *current* liked status. This is mainly accurate for logged-in users.
             boolean isCurrentlyLiked = currentUserId != 0L 
-                                            ? contentService.isLikedByUser(id, currentUserId) 
-                                            : true; // Set to true here to make the guest button "stick"
+                                             ? contentService.isLikedByUser(id, currentUserId) 
+                                             : true; // Set to true here to make the guest button "stick"
 
             response.put("success", true);
             response.put("newLikes", newLikes);
@@ -241,14 +241,21 @@ public class ContentController {
     }
 
     // -----------------------------------------------------------------------------------
-    // --- ADMIN MANAGEMENT ENDPOINTS ---
+    // --- ADMIN MANAGEMENT ENDPOINTS (UPDATED FOR PAGINATION) ---
     // -----------------------------------------------------------------------------------
 
     @GetMapping("/admin/dashboard")
-    public String adminDashboard(Model model, Authentication authentication) {
-        Page<Content> contentPage = contentService.getPaginated(null, 1, 50);
+    public String adminDashboard(Model model, 
+                                 @RequestParam(defaultValue = "1") int page, 
+                                 @RequestParam(defaultValue = "20") int size, // Increased default size for admin view
+                                 Authentication authentication) {
+                                 
+        // ⭐ FIX APPLIED: Admin dashboard now uses pagination parameters
+        Page<Content> contentPage = contentService.getPaginated(null, page, size); 
 
         model.addAttribute("contents", contentPage.getContent());
+        model.addAttribute("currentPage", contentPage.getNumber() + 1);
+        model.addAttribute("totalPages", contentPage.getTotalPages());
         model.addAttribute("content", new Content());
         model.addAttribute("isAdmin", isAdmin(authentication));
 
@@ -264,8 +271,8 @@ public class ContentController {
 
     @PostMapping("/admin/upload")
     public String uploadContent(@ModelAttribute Content content,
-                                 @RequestParam("file") MultipartFile file,
-                                 RedirectAttributes redirectAttributes) {
+                                @RequestParam("file") MultipartFile file,
+                                RedirectAttributes redirectAttributes) {
 
         try {
             contentService.saveContent(content, file);
@@ -294,8 +301,8 @@ public class ContentController {
 
     @PostMapping("/admin/update")
     public String updateContent(@ModelAttribute Content content,
-                                 @RequestParam(value = "file", required = false) MultipartFile file,
-                                 RedirectAttributes redirectAttributes) {
+                                @RequestParam(value = "file", required = false) MultipartFile file,
+                                RedirectAttributes redirectAttributes) {
         try {
             contentService.updateContent(content, file);
 

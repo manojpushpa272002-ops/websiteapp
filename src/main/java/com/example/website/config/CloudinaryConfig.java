@@ -20,8 +20,7 @@ public class CloudinaryConfig {
 
     @Bean
     public Cloudinary cloudinary() {
-        // Value is 300000 milliseconds (5 minutes)
-        int fiveMinutesInMilliseconds = 300000; 
+        
 
         // 1. Initialize the Cloudinary object
         // ⭐ CRITICAL FIX: Inject timeout properties directly into the Map ⭐
@@ -29,11 +28,9 @@ public class CloudinaryConfig {
                 "cloud_name", cloudName,
                 "api_key", apiKey,
                 "api_secret", apiSecret,
-                "secure", true, 
+                "secure", true
                 
-                // Add the connection and read timeouts (in milliseconds)
-                "connection_timeout", fiveMinutesInMilliseconds, 
-                "timeout", fiveMinutesInMilliseconds 
+              
         ));
     }
 }

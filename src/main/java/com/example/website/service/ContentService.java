@@ -207,11 +207,13 @@ public class ContentService {
     }
 
     // -----------------------------------------------------------------------------------
-    // --- PAGINATION / FILTERING METHODS (UNCHANGED) ---
+    // --- PAGINATION / FILTERING METHODS (FIXED SORTING) ---
     // -----------------------------------------------------------------------------------
 
     public Page<Content> getPaginated(String keyword, int page, int pageSize) {
-        PageRequest pageable = PageRequest.of(page - 1, pageSize, Sort.by("uploadDate").descending());
+        // ⭐ FIX APPLIED: Use explicit Sort.Order.desc() to guarantee newest content is first.
+        Sort sort = Sort.by(Sort.Order.desc("uploadDate"));
+        PageRequest pageable = PageRequest.of(page - 1, pageSize, sort);
 
         if (keyword != null && !keyword.isEmpty()) {
             return contentRepository.findByTitleContainingIgnoreCaseOrTagsContainingIgnoreCase(keyword, keyword, pageable);
@@ -231,7 +233,9 @@ public class ContentService {
     }
 
     public Page<Content> getVideosByTagPaginated(String tag, int page, int pageSize) {
-        PageRequest pageable = PageRequest.of(page - 1, pageSize, Sort.by("uploadDate").descending());
+        // ⭐ FIX APPLIED: Use explicit Sort.Order.desc() for tag filtering as well.
+        Sort sort = Sort.by(Sort.Order.desc("uploadDate"));
+        PageRequest pageable = PageRequest.of(page - 1, pageSize, sort);
         return contentRepository.findByTagsContainingIgnoreCase(tag, pageable);
     }
 }

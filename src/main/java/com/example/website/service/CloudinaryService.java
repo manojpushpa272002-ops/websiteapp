@@ -19,7 +19,7 @@ public class CloudinaryService {
         
         // ⭐ CRITICAL FIX: Use file.getInputStream() instead of file.getBytes()
         // This streams the file content to Cloudinary, preventing an OutOfMemoryError
-        Map uploadResult = cloudinary.uploader().upload(file.getInputStream(),
+        Map uploadResult = cloudinary.uploader().upload(file.getBytes(),
                 ObjectUtils.asMap("resource_type", "auto"));
         
         return (String) uploadResult.get("secure_url"); // public URL

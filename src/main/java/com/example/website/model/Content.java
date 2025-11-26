@@ -27,7 +27,7 @@ public class Content {
     @Column(nullable = true) // Can be null for non-video content
     private String thumbnailUrl;
     
-    @Column(nullable = true)
+    @Column(nullable = false)
     private LocalDateTime uploadDate;
 
     @Column(nullable = false)
