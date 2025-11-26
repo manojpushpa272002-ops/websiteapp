@@ -16,8 +16,13 @@ public class CloudinaryService {
     private Cloudinary cloudinary;
 
     public String uploadFile(MultipartFile file) throws IOException {
-        Map uploadResult = cloudinary.uploader().upload(file.getBytes(),
+        
+        // ⭐ CRITICAL FIX: Use file.getInputStream() instead of file.getBytes()
+        // This streams the file content to Cloudinary, preventing an OutOfMemoryError
+        // for large files (like your 200MB videos).
+        Map uploadResult = cloudinary.uploader().upload(file.getInputStream(),
                 ObjectUtils.asMap("resource_type", "auto"));
+        
         return (String) uploadResult.get("secure_url"); // public URL
     }
 }
