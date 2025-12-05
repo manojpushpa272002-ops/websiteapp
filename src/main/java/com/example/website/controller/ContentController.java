@@ -3,6 +3,7 @@ package com.example.website.controller;
 import com.example.website.model.Content;
 import com.example.website.model.User;
 import com.example.website.service.ContentService;
+import com.example.website.service.AmazonS3Service; // 🟢 Replaced ImagekitService
 import com.example.website.service.UserService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
@@ -27,13 +28,17 @@ public class ContentController {
 
     private final ContentService contentService;
     private final UserService userService;
+    private final AmazonS3Service amazonS3Service; // 🟢 Dependency Renamed
 
-    public ContentController(ContentService contentService, UserService userService) {
+    // 🟢 Constructor Updated for S3 Service
+    public ContentController(ContentService contentService, UserService userService, AmazonS3Service amazonS3Service) {
         this.contentService = contentService;
         this.userService = userService;
+        this.amazonS3Service = amazonS3Service;
     }
 
     private static final int PAGE_SIZE = 9;
+    
 
     /**
      * Helper to get the ID of the currently authenticated user.
@@ -123,10 +128,13 @@ public class ContentController {
 
             boolean isLiked = currentUserId != 0L && contentService.isLikedByUser(id, currentUserId);
 
-            // ⭐ FIX: REMOVED synchronous view increment here. 
-            // It is now handled by the JavaScript POST request upon playback/load.
-            // contentService.incrementViews(id); 
-
+            // 🟢 CRITICAL FIX: Generate the full public URL using the AmazonS3Service
+            // This assumes getPublicUrl() on the S3 service returns the full S3 or CloudFront URL.
+            String fullMediaUrl = amazonS3Service.getPublicUrl(content.getFilePath()); 
+            
+            // This URL is used by content-detail.html for the media player
+            model.addAttribute("fullMediaUrl", fullMediaUrl); 
+            
             model.addAttribute("content", content);
             model.addAttribute("isLiked", isLiked);
             model.addAttribute("isAdmin", isAdmin(authentication));
@@ -138,7 +146,7 @@ public class ContentController {
         }
     }
     
-    // ⭐ NEW ENDPOINT: Handles asynchronous view increment from content-detail.html ⭐
+    // NEW ENDPOINT: Handles asynchronous view increment from content-detail.html 
     @PostMapping("/view/increment/{id}")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> incrementViewAsync(@PathVariable Long id) {
@@ -249,8 +257,8 @@ public class ContentController {
                                  @RequestParam(defaultValue = "1") int page, 
                                  @RequestParam(defaultValue = "20") int size, // Increased default size for admin view
                                  Authentication authentication) {
-                                 
-        // ⭐ FIX APPLIED: Admin dashboard now uses pagination parameters
+                                     
+        // Admin dashboard now uses pagination parameters
         Page<Content> contentPage = contentService.getPaginated(null, page, size); 
 
         model.addAttribute("contents", contentPage.getContent());
@@ -271,14 +279,16 @@ public class ContentController {
 
     @PostMapping("/admin/upload")
     public String uploadContent(@ModelAttribute Content content,
-                                @RequestParam("file") MultipartFile file,
-                                RedirectAttributes redirectAttributes) {
+                                 @RequestParam("file") MultipartFile file,
+                                 RedirectAttributes redirectAttributes) {
 
         try {
-            contentService.saveContent(content, file);
-            redirectAttributes.addFlashAttribute("message", "Content uploaded successfully!");
+            // ContentService must be updated to use AmazonS3Service for file handling
+            contentService.saveContent(content, file); 
+            redirectAttributes.addFlashAttribute("uploadSuccess", "Content uploaded successfully!");
         } catch (IOException e) {
-            redirectAttributes.addFlashAttribute("error", "File upload failed: " + e.getMessage());
+            // Catches file stream errors AND S3 API errors rethrown as IOException
+            redirectAttributes.addFlashAttribute("uploadError", "File upload failed: " + e.getMessage());
         }
 
         return "redirect:/admin/dashboard";
@@ -301,15 +311,17 @@ public class ContentController {
 
     @PostMapping("/admin/update")
     public String updateContent(@ModelAttribute Content content,
-                                @RequestParam(value = "file", required = false) MultipartFile file,
-                                RedirectAttributes redirectAttributes) {
+                                 @RequestParam(value = "file", required = false) MultipartFile file,
+                                 RedirectAttributes redirectAttributes) {
         try {
+            // ContentService must be updated to use AmazonS3Service for file handling
             contentService.updateContent(content, file);
 
             redirectAttributes.addFlashAttribute("uploadSuccess", "Content ID " + content.getId() + " updated successfully!");
         } catch (EntityNotFoundException e) {
             redirectAttributes.addFlashAttribute("uploadError", "Update failed: Content not found.");
         } catch (IOException e) {
+            // Catches file stream errors AND S3 API errors rethrown as IOException
             redirectAttributes.addFlashAttribute("uploadError", "Update failed due to a file error: " + e.getMessage());
         }
 
@@ -319,12 +331,17 @@ public class ContentController {
     @GetMapping("/admin/delete/{id}")
     public String deleteContent(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
-            contentService.delete(id);
+            // ContentService must be updated to use AmazonS3Service for file deletion
+            contentService.delete(id); 
             redirectAttributes.addFlashAttribute("uploadSuccess", "Content deleted successfully!");
         } catch (EntityNotFoundException e) {
             redirectAttributes.addFlashAttribute("uploadError", e.getMessage());
+        } catch (IOException e) { 
+            // Correctly catches the IOException thrown by ContentService.delete() 
+            redirectAttributes.addFlashAttribute("uploadError", "Deletion failed due to a file service error: " + e.getMessage());
         }
-
+    
+     
         return "redirect:/admin/dashboard";
     }
     @GetMapping("/about")

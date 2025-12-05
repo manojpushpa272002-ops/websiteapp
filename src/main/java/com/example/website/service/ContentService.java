@@ -24,14 +24,17 @@ import java.util.Optional;
 public class ContentService {
 
     private final ContentRepository contentRepository;
-    private final CloudinaryService cloudinaryService;
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
+    private final AmazonS3Service amazonS3Service; // 🟢 Dependency changed to S3 Service
 
-    public ContentService(ContentRepository contentRepository, CloudinaryService cloudinaryService,
-                          LikeRepository likeRepository, CommentRepository commentRepository) {
+    
+    public ContentService(ContentRepository contentRepository, 
+                          AmazonS3Service amazonS3Service, // 🟢 Parameter changed
+                          LikeRepository likeRepository, 
+                          CommentRepository commentRepository) {
         this.contentRepository = contentRepository;
-        this.cloudinaryService = cloudinaryService;
+        this.amazonS3Service = amazonS3Service; // 🟢 Field assigned
         this.likeRepository = likeRepository;
         this.commentRepository = commentRepository;
     }
@@ -55,23 +58,27 @@ public class ContentService {
             throw new IOException("Cannot save content: Uploaded file is missing or empty.");
         }
 
-        // 1. Upload the main file
-        String publicUrl = cloudinaryService.uploadFile(file);
-        content.setFilePath(publicUrl);
+        // 1. Upload the main file. This returns the S3 File Key (the path).
+        // 🟢 Using amazonS3Service
+        String fileKey = amazonS3Service.uploadFile(file);
+        content.setFilePath(fileKey); 
 
         // 2. Determine file type
         String fileType = getFileType(file);
         content.setFileType(fileType);
 
-        // 3. ⭐ CRITICAL FIX: Generate and set thumbnail URL for videos ⭐
+        // 3. Generate and set the full public thumbnail URL
         if ("video".equals(fileType)) {
-            String thumbnailUrl = generateCloudinaryThumbnailUrl(publicUrl);
+            // 🟢 S3 does not natively support on-the-fly video poster generation like ImageKit.
+            // We use the S3 service's placeholder method, which typically returns the public URL of the video itself.
+            // In a production scenario, you would need to pre-generate a thumbnail and upload it separately.
+            String thumbnailUrl = amazonS3Service.getTransformedUrl(fileKey, "tr:w-400,c-at_max,f-jpg"); 
             content.setThumbnailUrl(thumbnailUrl);
         } else if ("image".equals(fileType)) {
-            // For images, the thumbnail URL can just be the main image URL itself
-            content.setThumbnailUrl(publicUrl);
+            // 🟢 Use the standard S3 public URL for the image thumbnail
+            content.setThumbnailUrl(amazonS3Service.getPublicUrl(fileKey));
         } else {
-            content.setThumbnailUrl(null); // Or a generic placeholder URL
+            content.setThumbnailUrl(null); 
         }
 
         content.setUploadDate(LocalDateTime.now());
@@ -87,25 +94,36 @@ public class ContentService {
         Content existingContent = contentRepository.findById(updatedContent.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Content not found with ID: " + updatedContent.getId()));
 
+        // Update metadata fields
         existingContent.setTitle(updatedContent.getTitle());
         existingContent.setDescription(updatedContent.getDescription());
         existingContent.setTags(updatedContent.getTags());
 
         if (file != null && !file.isEmpty()) {
-            // 1. Upload new file
-            String publicUrl = cloudinaryService.uploadFile(file);
-            existingContent.setFilePath(publicUrl);
+            // OPTIONAL: Delete the OLD file first (uncomment if required)
+            // try {
+            //     amazonS3Service.deleteFile(existingContent.getFilePath());
+            // } catch (Exception e) {
+            //     System.err.println("Warning: Could not delete old file from S3: " + e.getMessage());
+            //     // Continue with upload even if delete fails
+            // }
+            
+            // 1. Upload new file (and get the new S3 File Key)
+            // 🟢 Using amazonS3Service
+            String newFileKey = amazonS3Service.uploadFile(file);
+            existingContent.setFilePath(newFileKey);
 
             // 2. Determine new file type
             String fileType = getFileType(file);
             existingContent.setFileType(fileType);
 
-            // 3. ⭐ CRITICAL FIX: Update thumbnail URL if file changed ⭐
+            // 3. Update thumbnail URL if file changed
             if ("video".equals(fileType)) {
-                String thumbnailUrl = generateCloudinaryThumbnailUrl(publicUrl);
+                 // 🟢 Using S3 service's placeholder/default transformed URL
+                String thumbnailUrl = amazonS3Service.getTransformedUrl(newFileKey, "tr:w-400,c-at_max,f-jpg");
                 existingContent.setThumbnailUrl(thumbnailUrl);
             } else if ("image".equals(fileType)) {
-                existingContent.setThumbnailUrl(publicUrl);
+                existingContent.setThumbnailUrl(amazonS3Service.getPublicUrl(newFileKey));
             } else {
                 existingContent.setThumbnailUrl(null);
             }
@@ -114,37 +132,9 @@ public class ContentService {
         contentRepository.save(existingContent);
     }
 
-    /**
-     * Helper to create a thumbnail image URL from a Cloudinary video URL
-     * using URL transformations. This fix ensures the transformation parameters
-     * are correctly injected into the URL structure.
-     * @param videoUrl The base public URL of the video.
-     * @return The transformed URL pointing to a thumbnail image (.jpg).
-     */
-    private String generateCloudinaryThumbnailUrl(String videoUrl) {
-        // Transformation: width 400, fill, auto gravity, page 1 (first frame)
-        // DO NOT include the slashes here, they are added in the replace operation.
-        String transformation = "w_400,c_fill,g_auto,pg_1";
-
-        // 1. Inject the transformation: replaces "/upload/" with "/upload/transformation/"
-        String newUrl = videoUrl.replace("/upload/", "/upload/" + transformation + "/");
-
-        // 2. Change the file extension to .jpg (Crucial: Cloudinary needs this to return an image)
-        int lastDotIndex = newUrl.lastIndexOf('.');
-        if (lastDotIndex > newUrl.lastIndexOf('/')) {
-            // Correctly replace the extension (e.g., .mp4 to .jpg)
-            newUrl = newUrl.substring(0, lastDotIndex) + ".jpg";
-        } else {
-            // Fallback: add .jpg if no clear extension was found
-            newUrl += ".jpg";
-        }
-
-        return newUrl;
-    }
-
 
     // -----------------------------------------------------------------------------------
-    // --- VIEW & INTERACTION METHODS (UNCHANGED) ---
+    // --- VIEW & INTERACTION METHODS ---
     // -----------------------------------------------------------------------------------
 
     public List<Comment> getCommentsByContentId(Long contentId) {
@@ -152,13 +142,21 @@ public class ContentService {
     }
 
     public Content getById(Long id) {
-        return contentRepository.findById(id)
+        Content content = contentRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Content not found with ID: " + id));
+        
+        return content;
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id) throws IOException { 
         Content content = getById(id);
+        
+        // Delete the file from the AWS S3 service first
+        // 🟢 Using amazonS3Service
+        amazonS3Service.deleteFile(content.getFilePath()); 
+        
+        // Then delete the record from the database
         contentRepository.delete(content);
     }
 
@@ -207,11 +205,10 @@ public class ContentService {
     }
 
     // -----------------------------------------------------------------------------------
-    // --- PAGINATION / FILTERING METHODS (FIXED SORTING) ---
+    // --- PAGINATION / FILTERING METHODS ---
     // -----------------------------------------------------------------------------------
 
     public Page<Content> getPaginated(String keyword, int page, int pageSize) {
-        // ⭐ FIX APPLIED: Use explicit Sort.Order.desc() to guarantee newest content is first.
         Sort sort = Sort.by(Sort.Order.desc("uploadDate"));
         PageRequest pageable = PageRequest.of(page - 1, pageSize, sort);
 
@@ -233,7 +230,6 @@ public class ContentService {
     }
 
     public Page<Content> getVideosByTagPaginated(String tag, int page, int pageSize) {
-        // ⭐ FIX APPLIED: Use explicit Sort.Order.desc() for tag filtering as well.
         Sort sort = Sort.by(Sort.Order.desc("uploadDate"));
         PageRequest pageable = PageRequest.of(page - 1, pageSize, sort);
         return contentRepository.findByTagsContainingIgnoreCase(tag, pageable);

@@ -17,7 +17,6 @@
     <style>
         /* NEW COLOR PALETTE & LAYOUT */
         :root {
-       
             --dark-blue: #1D3557;
             --light-pink: #FADDE1;
             --accent-blue: #457B9D;
@@ -55,7 +54,7 @@
             font-weight: 900;
         }
         
-        /* AD Space Styling (Removed redundant comments for brevity) */
+        /* AD Space Styling */
         .ad-placeholder {
             background-color: var(--accent-blue);
             color: white;
@@ -229,8 +228,9 @@
 </head>
 <body>
 
-<div th:replace="~{fragments/navbar :: navbar}"></div> 
 
+i
+<div th:replace="~{fragments/navbar :: navbar}"></div> 
 <div class="container mt-4">
 
     <div class="row align-items-center mb-5">
@@ -283,7 +283,7 @@
                                 </div>
                                 
                                 <div th:if="${c.fileType == 'image'}">
-                                    <img th:src="${c.filePath}" th:alt="${c.title}" loading="lazy"/>
+                                    <img th:src="${c.thumbnailUrl}" th:alt="${c.title}" loading="lazy"/>
                                 </div>
                             </div>
                             </a>
@@ -326,19 +326,7 @@
             </div>
             
             <div class="ad-placeholder-banner mt-5 mb-3">
-   <script>
-(function(wlzi){
-var d = document,
-    s = d.createElement('script'),
-    l = d.scripts[d.scripts.length - 1];
-s.settings = wlzi || {};
-s.src = "\/\/useful-appearance.com\/bXXXV.sjdrGelU0xYVWxcE\/neymX9AuXZXUbl\/kVPfTRYV2gO\/THA_xaOBDlEWt\/NdjoYw5PMHDvE\/4JMMgI";
-s.async = true;
-s.referrerPolicy = 'no-referrer-when-downgrade';
-l.parentNode.insertBefore(s, l);
-})({})
-</script>
-            </div>
+                </div>
 
             <div th:if="${totalPages > 1}" class="d-flex justify-content-center mt-5">
                 <nav aria-label="Page navigation">
@@ -372,56 +360,33 @@ l.parentNode.insertBefore(s, l);
              <div class="ad-placeholder sticky-top mb-4" style="top: 20px;">
                  </div>
             <div class="ad-placeholder sticky-top" style="top: 290px;">
+            
+            <script>
+(function(keb){
+var d = document,
+    s = d.createElement('script'),
+    l = d.scripts[d.scripts.length - 1];
+s.settings = keb || {};
+s.src = "\/\/itchytree.com\/bGXAVTs.dIG\/lp0yYGWQcM\/Pexm\/9HuNZaUXl-keP\/T\/Y-2mOBTeYp4HM\/jIIJtxNfjyYM5qNoj\/gsyyMLwt";
+s.async = true;
+s.referrerPolicy = 'no-referrer-when-downgrade';
+l.parentNode.insertBefore(s, l);
+})({})
+</script>
                 </div>
         </div>
 
     </div>
     
     <div class="mobile-ad-bottom ad-placeholder-banner">
-<script>
-(function(jfaxh){
-var d = document,
-    s = d.createElement('script'),
-    l = d.scripts[d.scripts.length - 1];
-s.settings = jfaxh || {};
-s.src = "\/\/useful-appearance.com\/bFXrVxsbd.GhlK0RYmWZcg\/_eLmh9oudZaURlfkeP\/T_YK2QO\/TCAcxrNrzgIRtfNKjEYR5\/M\/DYEr3\/MLwA";
-s.async = true;
-s.referrerPolicy = 'no-referrer-when-downgrade';
-l.parentNode.insertBefore(s, l);
-})({})
-</script>
-    </div>
+        </div>
     <div class="row mt-5">
         <div class="col-12">
              <div class="ad-placeholder-banner mb-3">
-           <script>
-(function(evv){
-var d = document,
-    s = d.createElement('script'),
-    l = d.scripts[d.scripts.length - 1];
-s.settings = evv || {};
-s.src = "\/\/useful-appearance.com\/bJX.VjsNdCGal\/0zYYWTcy\/Fe\/mm9muQZcUBlBk\/PQTbY\/2BOgTTAUx\/NXjogJtYNIjDYh5\/MADOE-2\/OQQG";
-s.async = true;
-s.referrerPolicy = 'no-referrer-when-downgrade';
-l.parentNode.insertBefore(s, l);
-})({})
-</script>
-            </div>
+                 </div>
             
              <div class="ad-placeholder-banner">
-           <script>
-(function(bcey){
-var d = document,
-    s = d.createElement('script'),
-    l = d.scripts[d.scripts.length - 1];
-s.settings = bcey || {};
-s.src = "\/\/fraildepartment.com\/coD\/9V6db.2\/5\/loS-WQQB9KNMjqY\/5\/NYjcgzzlMxSd0\/2oNojFk\/2rOXDbM\/yq";
-s.async = true;
-s.referrerPolicy = 'no-referrer-when-downgrade';
-l.parentNode.insertBefore(s, l);
-})({})
-</script>
-                <div id="container-7cebcb3b220728f384cd1357a5d8fb8c"></div>
+                 <div id="container-7cebcb3b220728f384cd1357a5d8fb8c"></div>
             </div>         
         </div>
     </div>
@@ -444,6 +409,8 @@ l.parentNode.insertBefore(s, l);
 
         fetch(`/like/${contentId}`, {
             method: 'POST',
+            // CRITICAL: Must include CSRF token if user is logged in
+            // For dashboard like button, Spring Security should handle this via the JS/Browser
             headers: {'Content-Type': 'application/x-www-form-urlencoded'}
         })
         .then(response => {
@@ -462,15 +429,16 @@ l.parentNode.insertBefore(s, l);
                 
                 // 2. Update the button style based on the 'isLiked' state returned by the server
                 if (data.isLiked !== undefined) {
+                    const idNum = Number(contentId);
                     if (data.isLiked) {
                         // For logged-in users, update the set and style
-                        likedContentIds.add(Number(contentId)); 
+                        likedContentIds.add(idNum); 
                         button.classList.remove('btn-outline-primary');
                         button.classList.add('btn-primary');
                         textSpan.textContent = '[👍 Liked]';
                     } else {
                         // For logged-in users, update the set and style
-                        likedContentIds.delete(Number(contentId));
+                        likedContentIds.delete(idNum);
                         button.classList.remove('btn-primary');
                         button.classList.add('btn-outline-primary');
                         textSpan.textContent = '[🤍 Like]';

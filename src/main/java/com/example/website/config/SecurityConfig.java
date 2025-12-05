@@ -77,7 +77,7 @@ public class SecurityConfig {
             )
 
             // Disable CSRF for simpler development. Reconfigure for production!
-            .csrf(csrf -> csrf.disable());
+             .csrf(csrf -> csrf.disable());
 
         return http.build();
     }
